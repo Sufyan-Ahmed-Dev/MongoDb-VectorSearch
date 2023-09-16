@@ -4,7 +4,7 @@ import axios from 'axios';
 function Card() {
   const [ResponseData, setResponseData] = useState([]);
   const searchInputRef = useRef("")
-  const BaseURL = " http://localhost:8080"
+  const BaseURL = ""
 
   async function fetchData() {
     try {
