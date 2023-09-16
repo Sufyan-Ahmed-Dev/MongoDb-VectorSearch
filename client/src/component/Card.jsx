@@ -4,10 +4,11 @@ import axios from 'axios';
 function Card() {
   const [ResponseData, setResponseData] = useState([]);
   const searchInputRef = useRef("")
+  const BaseURL = " http://localhost:8080"
 
   async function fetchData() {
     try {
-      const response = await axios.get('http://localhost:8080/api/v1/allpost');
+      const response = await axios.get(`${BaseURL}/api/v1/allpost`);
       console.log(response.data);
       setResponseData(response.data);
     } catch (error) {
@@ -22,7 +23,7 @@ function Card() {
   const updateStory = async (e, id) => {
     e.preventDefault();
     try {
-      const response = await axios.put(`http://localhost:8080/api/v1/story/${id}`, {
+      const response = await axios.put(`${BaseURL}/api/v1/story/${id}`, {
         title: e.target.titleInput.value,
         body: e.target.bodyInput.value,
       });
@@ -35,7 +36,7 @@ function Card() {
 
   const deleteHandler = async (id) => {
     try {
-      const response = await axios.delete(`http://localhost:8080/api/v1/story/${id}`);
+      const response = await axios.delete(`${BaseURL}/api/v1/story/${id}`);
       console.log('response: ', response.data);
       
      await fetchData();
@@ -49,7 +50,7 @@ function Card() {
     e.preventDefault();
     try {
       // setIsLoading(true);
-      const resp = await axios.get(`http://localhost:8080/api/v1/search?q=${searchInputRef.current.value}`)
+      const resp = await axios.get(`${BaseURL}/api/v1/search?q=${searchInputRef.current.value}`)
       // console.log(resp.data);
       setResponseData(resp.data);
 
