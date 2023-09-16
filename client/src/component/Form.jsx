@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import axios from 'axios';
-import Card from './Card';
+
 import "../index.css"
 
 function Form() {
@@ -73,7 +73,7 @@ function Form() {
         <p>{err}</p>
         </div>
       </div>
-      <Card/>
+   
     </>
   );
 }
