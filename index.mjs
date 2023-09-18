@@ -1,9 +1,7 @@
 import express from "express";
 import cors from "cors";
-import path from 'path';
-import { customAlphabet } from 'nanoid'
-const nanoid = customAlphabet('1234567890', 20)
-import { PineconeClient } from "@pinecone-database/pinecone";
+import path from "path";
+import { MongoClient, ObjectId } from "mongodb";
 import OpenAI from "openai";
 const __dirname = path.resolve();
 import { config } from "dotenv";
@@ -16,198 +14,151 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-const pinecone = new PineconeClient();
-await pinecone.init({
-  environment: process.env.PINECONE_ENVIRONMENT,
-  apiKey: process.env.PINECONE_API_KEY,
-});
+const mongodbURI = process.env.DB_URL;
+const client = new MongoClient(mongodbURI);
+const database = client.db("SocialStories");
+const postCollection = database.collection("posts");
 
-
+async function run() {
+  try {
+    await client.connect();
+    await client.db("Socialstories").command({ ping: 1 });
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
+  } finally {
+    // await client.close();
+  }
+}
+run().catch(console.dir);
 
 app.use(express.json());
 app.use(cors());
 app.get(express.static(path.join(__dirname, "./client/dist")));
-app.use("/" , express.static(path.join(__dirname, "./client/dist")));
+app.use("/", express.static(path.join(__dirname, "./client/dist")));
 
 // Create a product
 app.post(`/api/v1/postStory`, async (req, res) => {
-
-  console.log(req.body)
-  const response = await openai.embeddings.create({
-    model: "text-embedding-ada-002",
-    input: `${req.body?.title} ${req.body?.desc}`,
-  });
-  console.log("response?.data: ", response?.data);
-  const vector = response?.data[0]?.embedding
-  console.log("vector: ", vector);
-
-  const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
-  const upsertRequest = {
-    vectors: [
-      {
-        id: nanoid(), // unique id, // unique id
-        values: vector,
-        metadata: {
-          title: req.body?.title,
-          body: req.body?.desc,
-        }
-      }
-    ],
-    // namespace: process.env.PINECONE_NAME_SPACE,
-  }
+  console.log(req.body);
+  console.log("Stories created function");
   try {
-    const upsertResponse = await index.upsert({ upsertRequest });
-    console.log("upsertResponse: ", upsertResponse);
+    const { title, body } = req.body;
+    if (!title || title.trim() === "") {
+      return handleError(res, 400, "title name is required");
+    }
 
-    res.send({
-      message: "story created successfully"
-    });
-  } catch (e) {
-    console.log("error: ", e)
-    res.status(500).send({
-      message: "failed to create story, please try later"
-    });
+    const product = { title, body };
+    const result = await postCollection.insertOne(product);
+
+    res.status(201).json(result)
+   
+  } catch (error) {
+    console.error(error);
+    
   }
 });
 
 // Get all products
 app.get("/api/v1/allpost", async (req, res) => {
-  console.log("Get run ");
-  const queryText = ""
+  const products = postCollection.find({}).sort({ _id: -1 }).project({ plot_embedding: 0 });
+  // console.log(products)
 
-
-  const response = await openai.embeddings.create({
-    model: "text-embedding-ada-002",
-    input: queryText,
-  });
-  const vector = response?.data[0]?.embedding
-  console.log("vector: ", vector);
-  const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
-  const queryResponse = await index.query({
-    queryRequest: {
-      vector: vector,
-      // id: "vec1",
-      topK: 100,
-      includeValues: true,
-      includeMetadata: true,
-      // namespace: process.env.PINECONE_NAME_SPACE
-    }
-  });
-
-  queryResponse.matches.map(eachMatch => {
-    console.log(`score ${eachMatch.score.toFixed(1)} => ${JSON.stringify(eachMatch.metadata)}\n\n`);
-  })
-  console.log(`${queryResponse.matches.length} records found `);
-
-  res.send(queryResponse.matches)
-  console.log("Donw", queryResponse.matches)
+  try {
+    const allproducts = await products.toArray();
+    // console.log(allproducts);
+    res.send(allproducts);
+  } catch (error) {
+    console.log(error.message);
+    handleError(res, 500, "Failed to get products");
+  }
 });
 
 app.put("/api/v1/story/:id", async (req, res) => {
+  if (!ObjectId.isValid(req.params.id)) {
+    res.status(403).send({ message: "incorrect product id" });
+    return;
+  }
 
+  let story = {};
 
-  console.log("req.params.id: ", req.params.id);
-  console.log("req.body: ", req.body);
-  // {
-  //     title: "abc title",
-  //     body: "abc text"
-  // }
+  if (req.body.title) story.title = req.body.title;
+  if (req.body.body) story.body = req.body.body;
 
-  // since pine cone can only store data in vector form (numeric representation of text)
-  // we will have to convert text data into vector of a certain dimension (1536 in case of openai)
-  const response = await openai.embeddings.create({
-    model: "text-embedding-ada-002",
-    input: `${req.body?.title} ${req.body?.body}`,
-  });
-  console.log("response?.data: ", response?.data);
-  const vector = response?.data[0]?.embedding
-  console.log("vector: ", vector);
-  // [ 0.0023063174, -0.009358601, 0.01578391, ... , 0.01678391, ]
-
-
-  const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
-  const upsertRequest = {
-    vectors: [
-      {
-        id: req.params.id, // unique id, // unique id
-        values: vector,
-        metadata: {
-          title: req.body?.title,
-          body: req.body?.body,
-        }
-      }
-    ],
-    // namespace: process.env.PINECONE_NAME_SPACE,
-  };
   try {
-    const upsertResponse = await index.upsert({ upsertRequest });
-    console.log("upsertResponse: ", upsertResponse);
+    const updateResponse = await postCollection.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: story }
+    );
+
+    console.log("Product updated: ", updateResponse);
 
     res.send({
-      message: "story updated successfully"
+      message: "story updated successfully",
     });
-  } catch (e) {
-    console.log("error: ", e)
-    res.status(500).send({
-      message: "failed to create story, please try later"
-    });
+  } catch (error) {
+    console.log("error", error);
+    res
+      .status(500)
+      .send({ message: "failed to update story, please try later" });
   }
 });
 
 app.delete("/api/v1/story/:id", async (req, res) => {
-
   try {
-    const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
-    const deleteResponse = await index.delete1({
-      ids: [req.params.id],
-      // namespace: process.env.PINECONE_NAME_SPACE 
-      
-    })
+    const deleteResponse = await postCollection.deleteOne({
+      _id: new ObjectId(req.params.id),
+    });
+    console.log("Story deleted: ", deleteResponse);
     console.log("deleteResponse: ", deleteResponse);
 
     res.send({
-      message: "story deleted successfully"
+      message: "story deleted successfully",
     });
-
   } catch (e) {
-    console.log("error: ", e)
+    console.log("error: ", e);
     res.status(500).send({
-      message: "failed to create story, please try later"
+      message: "failed to create story, please try later",
     });
   }
-
 });
 
 app.get("/api/v1/search", async (req, res) => {
-
   const queryText = req.query.q;
 
   const response = await openai.embeddings.create({
     model: "text-embedding-ada-002",
     input: queryText,
   });
-  const vector = response?.data[0]?.embedding
+  const vector = response?.data[0]?.embedding;
   console.log("vector: ", vector);
   // [ 0.0023063174, -0.009358601, 0.01578391, ... , 0.01678391, ]
 
-  const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
-  const queryResponse = await index.query({
-    queryRequest: {
-      vector: vector,
-      // id: "vec1",
-      topK: 20,
-      includeValues: false,
-      includeMetadata: true,
-      // namespace: process.env.PINECONE_NAME_SPACE
+ 
+  const documents = await postCollection.aggregate([
+    {
+      "$search": {
+        "index": "default",
+        "knnBeta": {
+          "vector": vector,
+          "path": "plot_embedding",
+          "k": 10
+        },
+        "scoreDetails": true
+      }
+    },
+    {
+      "$project": {
+        "plot_embedding": 0,
+        "score": { "$meta": "searchScore" },
+        "scoreDetails": { "$meta": "searchScoreDetails" }
+      },
+
     }
-  });
+  ]).toArray();
 
-  queryResponse.matches.map(eachMatch => {
-    console.log(`score ${eachMatch.score.toFixed(3)} => ${JSON.stringify(eachMatch.metadata)}\n\n`);
-  })
-  console.log(`${queryResponse.matches.length} records found `);
 
-  res.send(queryResponse.matches)
+  res.send(documents)
+
 });
 
 // Start the server
