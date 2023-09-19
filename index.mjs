@@ -6,7 +6,6 @@ import OpenAI from "openai";
 const __dirname = path.resolve();
 import { config } from "dotenv";
 config();
-const BaseURL = "http://localhost:8080";
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -90,7 +89,7 @@ app.put("/api/v1/story/:id", async (req, res) => {
       { $set: story }
     );
 
-    console.log("Product updated: ", updateResponse);
+    console.log("story updated: ", updateResponse);
 
     res.send({
       message: "story updated successfully",
@@ -161,9 +160,11 @@ app.get("/api/v1/search", async (req, res) => {
 
 });
 
+app.use("/", express.static(path.join(__dirname, "./client/dist")));
+
+
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
 });
 
-app.use("/", express.static(path.join(__dirname, "./client/build")));

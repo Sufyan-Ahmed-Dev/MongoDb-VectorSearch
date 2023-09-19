@@ -4,7 +4,7 @@ import axios from "axios";
 function Card() {
   const [responseData, setResponseData] = useState([]);
   const searchInputRef = useRef("");
-  const BaseURL = "http://localhost:8080";
+  const BaseURL = "https://vectorsearch-lye757lgr-sufyan-ahmed-dev.vercel.app";
   const titleRef = useRef("");
   const descriptionRef = useRef("");
   const [err, seterr] = useState("");
@@ -95,7 +95,7 @@ function Card() {
 
   return (
     <>
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="h-96 flex items-center justify-center bg-gray-100">
         <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
           <h1 className="text-2xl font-semibold mb-4">Create a Post</h1>
           <form onSubmit={handleSubmit}>
